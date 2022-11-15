@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"log"
 	"strings"
-	"tgbot_s3_uploader/config"
-	"tgbot_s3_uploader/util"
+	"s3telegram/config"
+	"s3telegram/util"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )

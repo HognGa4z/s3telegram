@@ -1,0 +1,5 @@
+*.log
+*.ini
+s3telegram
+supervisord.log
+supervisord.pid

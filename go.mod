@@ -1,4 +1,4 @@
-module tgbot_s3_uploader
+module s3telegram
 
 go 1.19
 

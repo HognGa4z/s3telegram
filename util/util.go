@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"tgbot_s3_uploader/config"
-	"tgbot_s3_uploader/s3"
+	"s3telegram/config"
+	"s3telegram/s3"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
