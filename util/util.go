@@ -1,6 +1,9 @@
 package util
 
 import (
+	"crypto/rand"
+	"encoding/base64"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -8,6 +11,7 @@ import (
 	"path/filepath"
 	"s3telegram/config"
 	"s3telegram/s3"
+	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
@@ -27,41 +31,22 @@ func pathExist(path string) bool {
 	return false
 }
 
-func DownloadPhoto(url string, file_id string, path string) error {
+func RandBase64() string {
+	size := 10 // change the length of the generated random string here
 
-	full_path := path + file_id
-	file, err := os.Create(full_path)
+	rb := make([]byte, size)
+	_, err := rand.Read(rb)
+
 	if err != nil {
-		log.Printf("Create file fail, [%s]", err.Error())
-		return err
-	}
-	defer file.Close()
-
-	client := http.Client{
-		CheckRedirect: func(r *http.Request, via []*http.Request) error {
-			r.URL.Opaque = r.URL.Path
-			return nil
-		},
+		fmt.Println(err)
 	}
 
-	resp, err := client.Get(url)
-	if err != nil {
-		log.Fatal(err)
-		return err
-	}
-	defer resp.Body.Close()
-
-	size, err := io.Copy(file, resp.Body)
-	if err != nil {
-		log.Fatal(err)
-	}
-	log.Printf("Download and save file size %d", size)
-
-	return nil
+	rs := base64.URLEncoding.EncodeToString(rb)
+	return rs
 }
 
 // download file to path
-func DownloadFile(url string, full_path string) error {
+func downloadFile(url string, full_path string) error {
 	file, err := os.Create(full_path)
 	if err != nil {
 		log.Printf("Create file fail, [%s]", err.Error())
@@ -93,16 +78,17 @@ func DownloadFile(url string, full_path string) error {
 	return nil
 }
 
-func ProcessDocument(doc *tgbotapi.Document, bot *tgbotapi.BotAPI, conf *config.BotConfig) (string, error) {
+func ProcessUploadS3(doc *tgbotapi.Document, bot *tgbotapi.BotAPI) (string, error) {
+	conf := config.GetConfig()
 	file_conf := tgbotapi.FileConfig{
 		FileID: doc.FileID,
 	}
-
 	file_conf.FileID = doc.FileID
 	file, err := bot.GetFile(file_conf)
 	if err != nil {
 		return "", err
 	}
+
 	url := file.Link(bot.Token)
 	log.Printf("url [%s]", url)
 	full_path := filepath.Join(conf.TmpPath, doc.FileID, file.FilePath)
@@ -111,7 +97,7 @@ func ProcessDocument(doc *tgbotapi.Document, bot *tgbotapi.BotAPI, conf *config.
 		os.MkdirAll(dir_path, os.ModePerm)
 	}
 
-	err2 := DownloadFile(url, full_path)
+	err2 := downloadFile(url, full_path)
 	if err2 != nil {
 		log.Fatal("Download file fail")
 		return "", err2
@@ -122,12 +108,24 @@ func ProcessDocument(doc *tgbotapi.Document, bot *tgbotapi.BotAPI, conf *config.
 		FileID:   doc.FileID,
 		FilePath: full_path,
 	}
-
-	s3_location, err := s3.UploadToS3(conf, file_desc)
+	s3_location, err := s3.UploadToS3(file_desc)
 	if err != nil {
-		log.Fatal(err)
+		log.Printf("upload to s3 fail, %s", err)
 		return "", err
 	}
-	log.Printf(s3_location)
+	log.Println(s3_location)
 	return s3_location, nil
+}
+
+func TmpFileClear() {
+	for range time.Tick(time.Hour) {
+		c := config.GetConfig()
+		filepath.Walk(c.TmpPath, func(path string, info os.FileInfo, err error) error {
+			if err == nil && time.Since(info.ModTime()) > 24*time.Hour {
+				os.RemoveAll(path)
+				return nil
+			}
+			return nil
+		})
+	}
 }
