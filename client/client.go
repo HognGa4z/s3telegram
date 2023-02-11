@@ -1,7 +1,6 @@
 package client
 
 import (
-	"context"
 	"log"
 	"s3telegram/config"
 	"sync"
@@ -11,29 +10,9 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
-	"github.com/go-redis/redis/v8"
 )
 
 var mutex = sync.Mutex{}
-
-var redisClient *redis.Client = nil
-
-func GetRedisClient() (*redis.Client, error) {
-	var ctx context.Context
-	if redisClient.Ping(ctx) == nil {
-		return redisClient, nil
-	}
-	c := config.GetConfig()
-
-	mutex.Lock()
-	redisClient = redis.NewClient(&redis.Options{
-		Addr:     c.RedisAddr,
-		Password: "", // no password set
-		DB:       0,  // use default DB
-	})
-	mutex.Unlock()
-	return redisClient, nil
-}
 
 var awsSession *session.Session = nil
 

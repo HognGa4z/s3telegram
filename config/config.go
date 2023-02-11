@@ -4,24 +4,25 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	"gopkg.in/ini.v1"
 )
 
 type BotConfig struct {
-	Token          string
-	TmpPath        string
+	BotToken       string `validate:"required"`
 	BotTimeout     int
-	S3AccessKey    string
-	S3SecretKey    string
-	S3Bucket       string
-	S3Host         string
-	CloudFrontHost string
-	RedisAddr      string
+	S3AccessKey    string `validate:"required"`
+	S3SecretKey    string `validate:"required"`
+	S3Bucket       string `validate:"required"`
+	S3Host         string `validate:"required"`
+	CloudFrontHost string `validate:"default=false"`
+	TmpPath        string `validate:"default=false"`
 }
 
-const configFile = "bot.ini"
+var configFile string = ""
 
 var Config *BotConfig = nil
 var lastModifyTime = time.Now()
@@ -36,7 +37,7 @@ func getLastModifyTime(filename string) time.Time {
 	return file.ModTime()
 }
 
-func GetConfig() *BotConfig {
+func getIniConfig() *BotConfig {
 	if Config != nil && getLastModifyTime(configFile).Sub(lastModifyTime) <= 0 {
 		log.Printf("already read config file")
 		return Config
@@ -48,26 +49,72 @@ func GetConfig() *BotConfig {
 		log.Fatal(err)
 	}
 
-	var config = new(BotConfig)
+	var config = &BotConfig{}
 
-	config.Token = file.Section("Bot").Key("token").String()
-	config.TmpPath = file.Section("Bot").Key("tmppath").String()
+	config.BotToken = file.Section("Bot").Key("token").String()
 	timeout, err := file.Section("Bot").Key("timeout").Int()
 	if err == nil {
 		config.BotTimeout = timeout
 	}
+	config.TmpPath = file.Section("Bot").Key("tmppath").String()
 	config.S3AccessKey = file.Section("S3").Key("s3accesskey").String()
 	config.S3SecretKey = file.Section("S3").Key("s3secretkey").String()
 	config.S3Bucket = file.Section("S3").Key("s3bucket").String()
 	config.S3Host = file.Section("S3").Key("s3host").String()
 	config.CloudFrontHost = file.Section("S3").Key("cloudfronthost").String()
-	config.RedisAddr = file.Section("Redis").Key("addr").String()
 
 	lastModifyTime = getLastModifyTime(configFile)
 
 	Config = config
-	fmt.Printf("Config: %v\n", Config)
+	log.Printf("Config: %v\n", Config)
 	return Config
+}
+
+func getEnvAsMap() map[string]string {
+	rtn := make(map[string]string)
+	for _, e := range os.Environ() {
+		if i := strings.Index(e, "="); i >= 0 {
+			rtn[e[:i]] = e[i+1:]
+		}
+	}
+
+	return rtn
+}
+
+func getEnvConfig(envMap map[string]string) *BotConfig {
+	fmt.Println(envMap)
+	config := &BotConfig{}
+	config.BotToken = envMap["bottoken"]
+	if timeoutstr, ok := envMap["bottimeout"]; ok {
+		if timeout, err := strconv.Atoi(timeoutstr); err == nil {
+			config.BotTimeout = timeout
+		}
+	}
+	config.S3AccessKey = envMap["s3accesskey"]
+	config.S3SecretKey = envMap["s3secretkey"]
+	config.S3Bucket = envMap["s3bucket"]
+	config.S3Host = envMap["s3host"]
+	if cloudfronthost, ok := envMap["cloudfronthost"]; ok {
+		config.CloudFrontHost = cloudfronthost
+	}
+	if tmppath, ok := envMap["tmppath"]; ok {
+		config.TmpPath = tmppath
+	} else {
+		config.TmpPath = "."
+	}
+
+	Config = config
+	log.Printf("Config: %v\n", Config)
+	return Config
+}
+
+func GetConfig() *BotConfig {
+	envMap := getEnvAsMap()
+	if _, ok := envMap["config_file"]; ok {
+		configFile = envMap["config_file"]
+		return getIniConfig()
+	}
+	return getEnvConfig(envMap)
 }
 
 type FileDesc struct {

@@ -16,7 +16,7 @@ func GetBot() *tgbotapi.BotAPI {
 
 	c := config.GetConfig()
 
-	bot, err := tgbotapi.NewBotAPI(c.Token)
+	bot, err := tgbotapi.NewBotAPI(c.BotToken)
 	if err != nil {
 		log.Panic(err)
 	}

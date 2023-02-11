@@ -34,7 +34,9 @@ func main() {
 					return
 				}
 				log.Printf("s3 location [%s]", s3_url)
-				s3_url = strings.Replace(s3_url, conf.S3Host, conf.CloudFrontHost, -1)
+				if conf.CloudFrontHost != "" {
+					s3_url = strings.Replace(s3_url, conf.S3Host, conf.CloudFrontHost, -1)
+				}
 				log.Printf("cloud front location [%s]", s3_url)
 
 				msg := tgbotapi.NewMessage(update.Message.Chat.ID, fmt.Sprintf("s3 location\n[%s]", s3_url))
